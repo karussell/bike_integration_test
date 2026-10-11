@@ -23,11 +23,6 @@ point=-32.0558,115.7258&point=-31.9957,115.5436
   time<2h
   comment=#2720 (closed, 2023): Rottnest ferry: bike 3:07 vs foot 3:44, duration of ferry relation 9083692 ignored
 
-point=50.45259%2C4.57512&point=50.441932%2C4.551656
-  &profile=bike
-  distance>3500m
-  comment=#3259 highway=trunk should not be used
-
 point=37.771237,-122.454767&point=37.770946,-122.456489
   &profile=bike
   time<2min

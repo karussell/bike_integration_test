@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Run *.list route test cases against a GraphHopper /route endpoint.
 
-usage: run_tests.py HOST [DIR|FILE.list ...] [--key KEY] [-v] [--no-color] [--save OUT]
-       run_tests.py --compare BASE.jsonl NEW.jsonl [-v]
+usage: run_tests.py HOST [DIR|FILE.list ...] [--key KEY] [-v] [--no-color] [--save OUT] [--skip LISTS]
+       run_tests.py --compare BASE.jsonl NEW.jsonl [-v] [--skip LISTS]
   HOST  base URL, e.g. https://graphhopper.com/api/1 or https://biketest.graphhopper.org
   DIR   profile folder with *.list files, e.g. bike; default: all */*.list next to this script
+  --skip LISTS  comma separated list names to leave out, e.g. world,israel (run and compare)
+Cases with a point outside the server bbox (/info) are not requested and counted as out_of_bbox;
+compare ignores cases that are out of bbox on either side.
   --save OUT  write one JSON line per test (status, metrics, fails); plain `diff` works on two such files
   --compare   list fixed/broken/still failing tests of NEW against BASE (-v: also passing tests with changed metrics)
 
@@ -28,6 +31,7 @@ RADIUS = 10  # m, for contains/avoids
 HERE = os.path.dirname(os.path.abspath(__file__))
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
 COLORS = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'WARN': '33', 'BOLD': '1'}
+OUT = 'OUT_OF_BBOX'
 
 
 def col(c, txt):
@@ -68,6 +72,7 @@ def load(path):
         lines = [l.strip() for l in block.split('\n')]
         t = {'file': os.path.relpath(path, HERE), 'src': f'{os.path.relpath(path, HERE)}:{len(tests) + 1}', 'query': lines[0],
              'points': lines[0].replace('%2C', ','), 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
+        t['coords'] = [tuple(map(float, c)) for c in re.findall(r'point=(-?[\d.]+),(-?[\d.]+)', t['points'])]
         for l in lines[1:]:
             try:
                 parse_line(t, l)
@@ -77,10 +82,15 @@ def load(path):
     return tests
 
 
-def list_files(paths):
+def list_name(path):  # bike/world.list:3 -> world
+    return os.path.basename(path.rsplit(':', 1)[0]).removesuffix('.list')
+
+
+def list_files(paths, skip):
     files = []
     for p in paths:
         files += sorted(glob.glob(os.path.join(p, '*', '*.list')) or glob.glob(os.path.join(p, '*.list'))) if os.path.isdir(p) else [p]
+    files = [f for f in files if list_name(f) not in skip]
     return files or sys.exit(f'no *.list files found in {paths}')
 
 
@@ -131,9 +141,11 @@ def get(args, path, query):
     return json.load(urllib.request.urlopen(url, timeout=60))
 
 
-def run(t, args, details):
+def run(t, args, details, bbox):
     if not (t['checks'] or t['contains'] or t['avoids']):
         return 'ERROR', ['no assertion'], {}
+    if bbox and any(not (bbox[1] <= lat <= bbox[3] and bbox[0] <= lon <= bbox[2]) for lat, lon in t['coords']):
+        return OUT, [], {}
     try:
         res = get(args, 'route', t['query'] + '&points_encoded=false&instructions=false' + ''.join('&details=' + d for d in details))
     except urllib.error.HTTPError as e:
@@ -159,24 +171,25 @@ def run_all(args):
         out = open(args.save, 'w') if args.save else None
     except OSError as e:
         sys.exit(f'cannot write {args.save}: {e.strerror}')
-    try:  # request only the path details the server knows
-        details = [d for d in DETAILS if d in get(args, 'info', '')['encoded_values']]
+    try:  # request only the path details the server knows, skip cases outside its bbox
+        info = get(args, 'info', '')
+        details, bbox = [d for d in DETAILS if d in info['encoded_values']], info.get('bbox')
     except Exception:
-        details = list(DETAILS)
-    files = list_files(args.files or [HERE])
+        details, bbox = list(DETAILS), None
+    files = list_files(args.files or [HERE], args.skip)
     tests = [t for f in files for t in load(f)]
-    counts, rows, cur, nl = {'PASS': 0, 'FAIL': 0, 'ERROR': 0}, [], None, ''  # nl: newline needed before the next full line
+    counts, rows, cur, nl = {'PASS': 0, 'FAIL': 0, 'ERROR': 0, OUT: 0}, [], None, ''  # nl: newline needed before the next full line
     print(f'{args.host}: {len(tests)} tests from {len(files)} files')
     for t in tests:
-        status, msgs, m = run(t, args, details)
+        status, msgs, m = run(t, args, details, bbox)
         counts[status] += 1
         rows.append({'src': t['src'], 'query': t['points'], 'status': status, 'metrics': {k: fmt(k, v) for k, v in m.items()}, 'fails': msgs})
         if t['file'] != cur:
             cur = t['file']
             print(nl + col('BOLD', f"{cur} ({sum(x['file'] == cur for x in tests)})") + ' ', end='', flush=True)
             nl = '\n'
-        if status == 'PASS' and not args.verbose:
-            print(col('PASS', '.'), end='', flush=True)
+        if status in ('PASS', OUT) and not args.verbose:
+            print(col('PASS', '.') if status == 'PASS' else '-', end='', flush=True)
             nl = '\n'
             continue
         print(nl + col(status, f'{status:5}') + f" {t['src']:27} {t['points']}")
@@ -188,15 +201,15 @@ def run_all(args):
         for msg in msgs:
             print('      ' + col(status, msg))
     print(nl + col('PASS', f"passed={counts['PASS']}") + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}")
-          + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}"))
+          + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}") + f" out_of_bbox={counts[OUT]}")
     if out:
         out.write(''.join(json.dumps(r) + '\n' for r in rows))
     sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
 
 
-def compare(base_file, new_file, verbose):
-    base = {r['src']: r for r in map(json.loads, open(base_file))}
-    new = [json.loads(l) for l in open(new_file)]
+def compare(base_file, new_file, verbose, skip):
+    base = {r['src']: r for r in map(json.loads, open(base_file)) if list_name(r['src']) not in skip}
+    new = [r for r in map(json.loads, open(new_file)) if list_name(r['src']) not in skip]
     diff = {'fixed': 0, 'now broken': 0, 'still failing': 0}
     print(f'{new_file} compared to {base_file}:')
     per_file = lambda rows: {f: sum(r['src'].rsplit(':', 1)[0] == f for r in rows) for f in {r['src'].rsplit(':', 1)[0] for r in rows}}
@@ -204,6 +217,9 @@ def compare(base_file, new_file, verbose):
     for f in sorted(nb.keys() | nn.keys()):
         if nb.get(f, 0) != nn.get(f, 0):
             print(col('WARN', f'warning: {f} has {nb.get(f, 0)} cases in {base_file} but {nn.get(f, 0)} in {new_file}'))
+    out = [r['src'] for r in new if OUT in (r['status'], base.get(r['src'], {}).get('status'))]
+    base = {k: v for k, v in base.items() if k not in out}
+    new = [r for r in new if r['src'] not in out]
     for r in new:
         b = base.get(r['src'])
         if not b:
@@ -220,7 +236,8 @@ def compare(base_file, new_file, verbose):
         for msg in r['fails']:
             print('              ' + col(r['status'], msg))
     passed = lambda rows: sum(r['status'] == 'PASS' for r in rows)
-    print(' '.join(f'{k}={v}' for k, v in diff.items()) + f' | passed {passed(base.values())}/{len(base)} -> {passed(new)}/{len(new)}')
+    print(' '.join(f'{k}={v}' for k, v in diff.items()) + f' | passed {passed(base.values())}/{len(base)} -> {passed(new)}/{len(new)}'
+          + f' | out_of_bbox on one side={len(out)}')
 
 
 def main():
@@ -232,11 +249,13 @@ def main():
     ap.add_argument('--no-color', action='store_true')
     ap.add_argument('--save', metavar='OUT')
     ap.add_argument('--compare', nargs=2, metavar=('BASE', 'NEW'))
+    ap.add_argument('--skip', metavar='LISTS', default='', help='comma separated list names to leave out, e.g. world,israel')
     args = ap.parse_args()
+    args.skip = {x.strip().removesuffix('.list') for x in args.skip.split(',') if x.strip()}
     col.on = sys.stdout.isatty() and not args.no_color
     if args.compare:
         missing = [f for f in args.compare if not os.path.isfile(f)]
-        return compare(*args.compare, args.verbose) if not missing else sys.exit(f'no such file: {missing[0]}')
+        return compare(*args.compare, args.verbose, args.skip) if not missing else sys.exit(f'no such file: {missing[0]}')
     if not args.host:
         ap.error('HOST or --compare BASE NEW required')
     run_all(args)
