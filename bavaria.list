@@ -1,0 +1,25 @@
+point=50.015769%2C11.579432&point=50.027805%2C11.567639
+  profile=bike
+  contains=50.022849,11.575044
+  comment=should prefer hilly track instead of busy secondary
+
+point=50.02875%2C11.566826&point=50.030012%2C11.564515
+  profile=bike
+  contains=50.029414,11.565479
+  comment=stay on secondary
+
+point=49.948873%2C11.575797&point=50.058299%2C11.54492
+  profile=bike
+  time<56min
+  distance<16.5km
+  ascend<100m
+  low_stress_part>80
+  comment=east path faster + shorter + less incline + less stress (west alternative might be picked as better bike network)
+
+point=48.064363%2C11.543991&point=48.037783%2C11.521579
+  profile=bike
+  bike_network_part>95
+
+point=48.037783%2C11.521579&point=48.064363%2C11.543991
+  profile=bike
+  bike_network_part>95
