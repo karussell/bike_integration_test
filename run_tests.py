@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Run *.list route test cases against a GraphHopper /route endpoint.
 
-usage: run_tests.py HOST [--key KEY] [--tolerance M] [-v] [--no-color] [FILE.list ...]
+usage: run_tests.py HOST [--key KEY] [--tolerance M=10] [-v] [--no-color] [--save OUT] [--compare BASE] [FILE.list ...]
   HOST  base URL, e.g. https://graphhopper.com/api/1 or https://biketest.graphhopper.org
   FILE  default: all *.list next to this script
+  --save OUT      write one JSON line per test (status, metrics, fails); plain `diff` works on two such files
+  --compare BASE  after the run list fixed/broken/changed tests against a saved file
 
 Test case format (blocks separated by blank lines):
   point=lat,lon&point=lat,lon[&any=query&params]   first line, raw /route query string
   profile=bike
   distance<1400m | distance=5.5km-6.5km | time<56min | time=9h30m-10h30m | ascend<100m | descend>...
-  low_stress_part>75        % of distance not on motorway/trunk/primary/secondary/tertiary
+  low_stress_part>75        % of distance with bike LTS 1-2 as in graphhopper-maps (road_class, cycleway, urban_density)
   bike_network_part>70      % of distance with bike_network != missing
   contains=lat,lon;lat,lon  route passes within --tolerance m of each point
   comment=...               printed on failure
@@ -17,7 +19,8 @@ Operators: <, <=, >, >=, =range (a-b) or =single value (±10 %).
 """
 import argparse, glob, json, math, operator, os, re, sys, urllib.request
 
-STRESS = {'motorway', 'trunk', 'primary', 'secondary', 'tertiary'}
+LTS1 = {'cycleway', 'path', 'footway', 'pedestrian', 'living_street', 'bridleway', 'track', 'corridor'}
+DETAILS = ['road_class', 'cycleway', 'urban_density', 'bike_network']
 UNITS = {'': 1, 'm': 1, 'km': 1000, 's': 1, 'min': 60, 'h': 3600}
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
 
@@ -25,9 +28,26 @@ OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
 def num(key, s):
     if key == 'time':  # 9h30m, 56min, 4m, 30s
         m = re.fullmatch(r'(?:(\d+)h)?(?:(\d+)(?:m|min))?(?:(\d+)s)?', s)
+        if not m or not any(m.groups()):
+            raise ValueError(f'time needs a unit (h, m, min, s): {s!r}')
         return sum(int(v or 0) * f for v, f in zip(m.groups(), (3600, 60, 1)))
     m = re.fullmatch(r'([\d.]+)\s*(\w*)', s)
+    if not m or (key == 'distance' and not m.group(2)):
+        raise ValueError(f'{key} needs a unit (m, km): {s!r}')
     return float(m.group(1)) * UNITS[m.group(2)]
+
+
+def parse_line(t, l):
+    k, op, v = re.fullmatch(r'(\w+)\s*(<=|>=|<|>|=)\s*(.*)', l).groups()
+    if k in ('comment', 'contains'):
+        t[k] = v if k == 'comment' else [tuple(map(float, p.split(','))) for p in v.split(';')]
+    elif k == 'profile':
+        t['query'] += '&profile=' + v
+    elif op != '=':
+        t['checks'].append((k, op, num(k, v), v))
+    else:  # range a-b or single value ±10 %
+        lo, hi = [num(k, x) for x in v.split('-')] if '-' in v else (num(k, v) * 0.9, num(k, v) * 1.1)
+        t['checks'] += [(k, '>=', lo, v), (k, '<=', hi, v)]
 
 
 def load(path):
@@ -36,16 +56,10 @@ def load(path):
         lines = [l.strip() for l in block.split('\n')]
         t = {'src': f'{os.path.basename(path)}:{len(tests) + 1}', 'query': lines[0], 'checks': [], 'contains': [], 'comment': ''}
         for l in lines[1:]:
-            k, op, v = re.fullmatch(r'(\w+)\s*(<=|>=|<|>|=)\s*(.*)', l).groups()
-            if k in ('comment', 'contains'):
-                t[k] = v if k == 'comment' else [tuple(map(float, p.split(','))) for p in v.split(';')]
-            elif k == 'profile':
-                t['query'] += '&profile=' + v
-            elif op != '=':
-                t['checks'].append((k, op, num(k, v), v))
-            else:  # range a-b or single value ±10 %
-                lo, hi = [num(k, x) for x in v.split('-')] if '-' in v else (num(k, v) * 0.9, num(k, v) * 1.1)
-                t['checks'] += [(k, '>=', lo, v), (k, '<=', hi, v)]
+            try:
+                parse_line(t, l)
+            except (AttributeError, KeyError, ValueError) as e:
+                sys.exit(f"{t['src']}: cannot parse {l!r} ({e})")
         tests.append(t)
     return tests
 
@@ -61,13 +75,27 @@ def seg_dist(p, a, b):  # distance of p=(lat,lon) to segment a-b of (lon,lat) po
     return math.hypot(ax + t * dx - px, ay + t * dy - py)
 
 
+def bike_lts(rc, cw, rural):  # port of classifyBikeLTS in graphhopper-maps
+    if cw in ('track', 'separate') or rc in LTS1:
+        return 1
+    if rc in ('trunk', 'motorway'):
+        return 4
+    if rc in ('primary', 'secondary'):
+        return 3 if cw == 'lane' or (cw == 'missing' and not rural) else 4
+    if rc == 'tertiary':
+        return 2 if cw == 'lane' and not rural else 3
+    return 3 if rc == 'steps' or (rc == 'unclassified' and rural) else 2
+
+
 def metrics(path):
     pts = path['points']['coordinates']
     seg = [math.dist(xy(*a, a[1]), xy(*b, a[1])) for a, b in zip(pts, pts[1:])]
-    part = lambda name, ok: 100 * sum(sum(seg[i:j]) for i, j, v in path['details'].get(name, []) if ok(v)) / sum(seg)
+    per_seg = lambda name, default: [v for i, j, v in path['details'].get(name, [(0, len(seg), default)]) for _ in range(j - i)]
+    rc, cw, ud, bn = (per_seg(n, d) for n, d in zip(DETAILS, ('other', 'missing', 'residential', 'missing')))  # order as DETAILS
+    part = lambda ok: 100 * sum(d for d, o in zip(seg, ok) if o) / sum(seg)
     return {'distance': path['distance'], 'time': path['time'] / 1000, 'ascend': path.get('ascend', 0), 'descend': path.get('descend', 0),
-            'low_stress_part': part('road_class', lambda v: v not in STRESS),
-            'bike_network_part': part('bike_network', lambda v: v not in (None, 'missing'))}, pts
+            'low_stress_part': part(bike_lts(r, c, u == 'rural') <= 2 for r, c, u in zip(rc, cw, ud)),
+            'bike_network_part': part(b != 'missing' for b in bn)}, pts
 
 
 def fmt(k, x):
@@ -79,7 +107,7 @@ def fmt(k, x):
 
 
 def run(t, args):
-    url = f"{args.host.rstrip('/')}/route?{t['query']}&points_encoded=false&instructions=false&details=road_class&details=bike_network"
+    url = f"{args.host.rstrip('/')}/route?{t['query']}&points_encoded=false&instructions=false" + ''.join('&details=' + d for d in args.details)
     try:
         res = json.load(urllib.request.urlopen(url + (f'&key={args.key}' if args.key else ''), timeout=60))
     except urllib.error.HTTPError as e:
@@ -102,20 +130,28 @@ def main():
     ap.add_argument('host')
     ap.add_argument('files', nargs='*')
     ap.add_argument('--key')
-    ap.add_argument('--tolerance', type=float, default=50, help='contains tolerance in m (default 50)')
+    ap.add_argument('--tolerance', type=float, default=10, help='contains tolerance in m (default 10)')
     ap.add_argument('-v', '--verbose', action='store_true', help='print metrics for passed tests too')
     ap.add_argument('--no-color', action='store_true')
+    ap.add_argument('--save', metavar='OUT')
+    ap.add_argument('--compare', metavar='BASE')
     args = ap.parse_args()
     color = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'BOLD': '1'} if sys.stdout.isatty() and not args.no_color else {}
     col = lambda c, txt: f'\033[{color[c]}m{txt}\033[0m' if c in color else txt
+    try:  # request only the path details the server knows
+        evs = json.load(urllib.request.urlopen(f"{args.host.rstrip('/')}/info" + (f'?key={args.key}' if args.key else ''), timeout=30))['encoded_values']
+        args.details = [d for d in DETAILS if d in evs]
+    except Exception:
+        args.details = DETAILS
     files = args.files or sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), '*.list')))
     tests = [t for f in files for t in load(f)]
     counts = {'PASS': 0, 'FAIL': 0, 'ERROR': 0}
     print(f'{args.host}: {len(tests)} tests from {len(files)} files')
-    cur, nl = None, ''  # nl = newline needed before the next full line
+    cur, nl, rows = None, '', []  # nl = newline needed before the next full line
     for t in tests:
         status, msgs, m = run(t, args)
         counts[status] += 1
+        rows.append({'src': t['src'], 'status': status, 'metrics': {k: fmt(k, v) for k, v in m.items()}, 'fails': msgs})
         if t['src'].split(':')[0] != cur:
             cur = t['src'].split(':')[0]
             print(nl + col('BOLD', f"{cur} ({sum(x['src'].startswith(cur + ':') for x in tests)})") + ' ', end='', flush=True)
@@ -133,6 +169,25 @@ def main():
         print(*('      ' + col(status, msg) for msg in msgs), sep='\n', end='' if not msgs else '\n')
     print(nl + col('PASS', f"passed={counts['PASS']}") + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}")
           + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}"))
+    if args.save:
+        open(args.save, 'w').write(''.join(json.dumps(r) + '\n' for r in rows))
+    if args.compare:
+        base = {r['src']: r for r in map(json.loads, open(args.compare))}
+        diff = {'fixed': 0, 'broken': 0, 'still failing': 0}
+        print(f'\ncompared to {args.compare}:')
+        for r in rows:
+            b = base.get(r['src'])
+            if not b:
+                continue
+            kind = ('fixed' if r['status'] == 'PASS' else 'still failing') if b['status'] != 'PASS' else ('broken' if r['status'] != 'PASS' else 'pass')
+            if kind == 'pass' and not args.verbose:
+                continue
+            diff[kind] = diff.get(kind, 0) + 1
+            print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:22} "
+                  + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v))
+            for msg in r['fails']:
+                print('              ' + col(r['status'], msg))
+        print(' '.join(f'{k}={v}' for k, v in diff.items()))
     sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
 
 
