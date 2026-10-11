@@ -188,19 +188,19 @@ def main():
 
 def compare(base_file, new_file, verbose, col):
     base = {r['src']: r for r in map(json.loads, open(base_file))}
-    diff = {'fixed': 0, 'broken': 0, 'still failing': 0}
+    diff = {'fixed': 0, 'now broken': 0, 'still failing': 0}
     print(f'{new_file} compared to {base_file}:')
     for r in map(json.loads, open(new_file)):
         b = base.get(r['src'])
         if not b:
             continue
-        kind = ('fixed' if r['status'] == 'PASS' else 'still failing') if b['status'] != 'PASS' else ('broken' if r['status'] != 'PASS' else 'pass')
+        kind = ('fixed' if r['status'] == 'PASS' else 'still failing') if b['status'] != 'PASS' else ('now broken' if r['status'] != 'PASS' else 'pass')
         if kind == 'pass' and not verbose:
             continue
         diff[kind] = diff.get(kind, 0) + 1
         print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:22} "
               + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v and kind != 'fixed'))
-        if kind in ('broken', 'still failing'):
+        if kind in ('now broken', 'still failing'):
             print('              ' + r.get('query', ''))
         for msg in r['fails']:
             print('              ' + col(r['status'], msg))
