@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run *.list route test cases against a GraphHopper /route endpoint.
 
-usage: run_tests.py HOST [--key KEY] [--tolerance M=10] [-v] [--no-color] [--save OUT] [--compare BASE] [FILE.list ...]
+usage: run_tests.py HOST [--key KEY] [-v] [--no-color] [--save OUT] [--compare BASE] [FILE.list ...]
   HOST  base URL, e.g. https://graphhopper.com/api/1 or https://biketest.graphhopper.org
   FILE  default: all *.list next to this script
   --save OUT      write one JSON line per test (status, metrics, fails); plain `diff` works on two such files
@@ -13,7 +13,8 @@ Test case format (blocks separated by blank lines):
   distance<1400m | distance=5.5km-6.5km | time<56min | time=9h30m-10h30m | ascend<100m | descend>...
   low_stress_part>75        % of distance with bike LTS 1-2 as in graphhopper-maps (road_class, cycleway, urban_density)
   bike_network_part>70      % of distance with bike_network != missing
-  contains=lat,lon;lat,lon  route passes within --tolerance m of each point
+  contains=lat,lon;lat,lon  route passes within 10 m of each point
+  avoids=lat,lon;lat,lon    route stays more than 10 m away from each point
   comment=...               printed on failure
 Operators: <, <=, >, >=, =range (a-b) or =single value (±10 %).
 """
@@ -22,6 +23,7 @@ import argparse, glob, json, math, operator, os, re, sys, urllib.request
 LTS1 = {'cycleway', 'path', 'footway', 'pedestrian', 'living_street', 'bridleway', 'track', 'corridor'}
 DETAILS = ['road_class', 'cycleway', 'urban_density', 'bike_network']
 UNITS = {'': 1, 'm': 1, 'km': 1000, 's': 1, 'min': 60, 'h': 3600}
+RADIUS = 10  # m, for contains/avoids
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
 
 
@@ -39,7 +41,7 @@ def num(key, s):
 
 def parse_line(t, l):
     k, op, v = re.fullmatch(r'(\w+)\s*(<=|>=|<|>|=)\s*(.*)', l).groups()
-    if k in ('comment', 'contains'):
+    if k in ('comment', 'contains', 'avoids'):
         t[k] = v if k == 'comment' else [tuple(map(float, p.split(','))) for p in v.split(';')]
     elif k == 'profile':
         t['query'] += '&profile=' + v
@@ -54,7 +56,7 @@ def load(path):
     tests = []
     for block in re.split(r'\n\s*\n', open(path).read().strip()):
         lines = [l.strip() for l in block.split('\n')]
-        t = {'src': f'{os.path.basename(path)}:{len(tests) + 1}', 'query': lines[0], 'checks': [], 'contains': [], 'comment': ''}
+        t = {'src': f'{os.path.basename(path)}:{len(tests) + 1}', 'query': lines[0], 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
         for l in lines[1:]:
             try:
                 parse_line(t, l)
@@ -118,10 +120,11 @@ def run(t, args):
     m, pts = metrics(res['paths'][0])
     fails = [f"{k} too {'large' if op[0] == '<' else 'small'}: {k}{op}{raw} but {fmt(k, m[k])}"
              for k, op, v, raw in t['checks'] if not OPS[op](m[k], v)]
-    for c in t['contains']:
-        d = min(seg_dist(c, a, b) for a, b in zip(pts, pts[1:]))
-        if d > args.tolerance:
-            fails.append(f'not contains: {c[0]},{c[1]} missed by {d:.0f}m')
+    for key, bad in (('contains', lambda d: d > RADIUS), ('avoids', lambda d: d <= RADIUS)):
+        for c in t[key]:
+            d = min(seg_dist(c, a, b) for a, b in zip(pts, pts[1:]))
+            if bad(d):
+                fails.append(f"not {key}: {c[0]},{c[1]} {'missed' if key == 'contains' else 'passed'} by {d:.0f}m")
     return ('FAIL' if fails else 'PASS'), fails, m
 
 
@@ -130,7 +133,6 @@ def main():
     ap.add_argument('host')
     ap.add_argument('files', nargs='*')
     ap.add_argument('--key')
-    ap.add_argument('--tolerance', type=float, default=10, help='contains tolerance in m (default 10)')
     ap.add_argument('-v', '--verbose', action='store_true', help='print metrics for passed tests too')
     ap.add_argument('--no-color', action='store_true')
     ap.add_argument('--save', metavar='OUT')
