@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Run *.list route test cases against a GraphHopper /route endpoint.
 
-usage: run_tests.py HOST [--key KEY] [-v] [--no-color] [--save OUT] [--compare BASE] [FILE.list ...]
+usage: run_tests.py HOST [--key KEY] [-v] [--no-color] [--save OUT] [FILE.list ...]
+       run_tests.py --compare BASE.jsonl NEW.jsonl [-v]
   HOST  base URL, e.g. https://graphhopper.com/api/1 or https://biketest.graphhopper.org
   FILE  default: all *.list next to this script
-  --save OUT      write one JSON line per test (status, metrics, fails); plain `diff` works on two such files
-  --compare BASE  after the run list fixed/broken/changed tests against a saved file
+  --save OUT  write one JSON line per test (status, metrics, fails); plain `diff` works on two such files
+  --compare   list fixed/broken/still failing tests of NEW against BASE (-v: also passing tests with changed metrics)
 
 Test case format (blocks separated by blank lines):
   point=lat,lon&point=lat,lon[&any=query&params]   first line, raw /route query string
@@ -130,16 +131,20 @@ def run(t, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('host')
+    ap.add_argument('host', nargs='?')
     ap.add_argument('files', nargs='*')
     ap.add_argument('--key')
     ap.add_argument('-v', '--verbose', action='store_true', help='print metrics for passed tests too')
     ap.add_argument('--no-color', action='store_true')
     ap.add_argument('--save', metavar='OUT')
-    ap.add_argument('--compare', metavar='BASE')
+    ap.add_argument('--compare', nargs=2, metavar=('BASE', 'NEW'))
     args = ap.parse_args()
     color = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'BOLD': '1'} if sys.stdout.isatty() and not args.no_color else {}
     col = lambda c, txt: f'\033[{color[c]}m{txt}\033[0m' if c in color else txt
+    if args.compare:
+        return compare(*args.compare, args.verbose, col)
+    if not args.host:
+        ap.error('HOST or --compare BASE NEW required')
     try:  # request only the path details the server knows
         evs = json.load(urllib.request.urlopen(f"{args.host.rstrip('/')}/info" + (f'?key={args.key}' if args.key else ''), timeout=30))['encoded_values']
         args.details = [d for d in DETAILS if d in evs]
@@ -173,24 +178,26 @@ def main():
           + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}"))
     if args.save:
         open(args.save, 'w').write(''.join(json.dumps(r) + '\n' for r in rows))
-    if args.compare:
-        base = {r['src']: r for r in map(json.loads, open(args.compare))}
-        diff = {'fixed': 0, 'broken': 0, 'still failing': 0}
-        print(f'\ncompared to {args.compare}:')
-        for r in rows:
-            b = base.get(r['src'])
-            if not b:
-                continue
-            kind = ('fixed' if r['status'] == 'PASS' else 'still failing') if b['status'] != 'PASS' else ('broken' if r['status'] != 'PASS' else 'pass')
-            if kind == 'pass' and not args.verbose:
-                continue
-            diff[kind] = diff.get(kind, 0) + 1
-            print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:22} "
-                  + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v))
-            for msg in r['fails']:
-                print('              ' + col(r['status'], msg))
-        print(' '.join(f'{k}={v}' for k, v in diff.items()))
     sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
+
+
+def compare(base_file, new_file, verbose, col):
+    base = {r['src']: r for r in map(json.loads, open(base_file))}
+    diff = {'fixed': 0, 'broken': 0, 'still failing': 0}
+    print(f'{new_file} compared to {base_file}:')
+    for r in map(json.loads, open(new_file)):
+        b = base.get(r['src'])
+        if not b:
+            continue
+        kind = ('fixed' if r['status'] == 'PASS' else 'still failing') if b['status'] != 'PASS' else ('broken' if r['status'] != 'PASS' else 'pass')
+        if kind == 'pass' and not verbose:
+            continue
+        diff[kind] = diff.get(kind, 0) + 1
+        print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:22} "
+              + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v))
+        for msg in r['fails']:
+            print('              ' + col(r['status'], msg))
+    print(' '.join(f'{k}={v}' for k, v in diff.items()))
 
 
 if __name__ == '__main__':
