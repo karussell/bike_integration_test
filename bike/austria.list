@@ -1,3 +1,7 @@
 point=47.07,15.44&point=46.7942,15.8357
   &profile=bike
   ascend<250m
+
+point=47.28052%2C11.405227&point=47.303004%2C11.422004
+  &profile=bike
+  time>100m
