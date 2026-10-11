@@ -23,3 +23,23 @@ point=48.064363%2C11.543991&point=48.037783%2C11.521579
 point=48.037783%2C11.521579&point=48.064363%2C11.543991
   &profile=bike
   bike_network_part>95
+
+point=47.505802,10.367285&point=47.506128,10.368208
+  &profile=bike
+  distance<80m
+  comment=elevation model should not avoid the direct residential street
+
+point=49.979322,11.563389&point=49.983174,11.559266
+  &profile=bike
+  distance>1km
+  comment=TODO #2668 (closed, 2022): way with horrible smoothness should be avoided
+
+point=48.733192,12.189704&point=48.728084,12.18944
+  &profile=bike
+  distance<600m
+  comment=TODO #2784 (closed, 2023): main road 552856505 has cycleway=lane but GH detours via road 86263970 without bike infrastructure
+
+point=48.286141,11.584877&point=48.280145,11.587689
+  &profile=bike
+  distance>700m
+  comment=#3112 (open, 2025): bicycle:backward=use_sidepath ignored, tertiary used instead of the compulsory cycleway next to it

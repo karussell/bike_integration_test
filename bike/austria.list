@@ -5,3 +5,52 @@ point=47.07,15.44&point=46.7942,15.8357
 point=47.28052%2C11.405227&point=47.303004%2C11.422004
   &profile=bike
   time>100m
+
+point=48.017946,16.013775&point=47.993885,15.955324
+  &profile=bike
+  ascend<600m
+
+point=48.179737,16.115484&point=48.175072,16.122608
+  &profile=bike
+  distance<1km
+  comment=#1831 (closed, 2019): big detour because way 155156339 has vehicle=destination + bicycle=yes; destination penalty should not hit bike
+
+point=47.211323,11.333352&point=47.214141,11.339644
+  &profile=bike
+  distance<709m
+  comment=#3049 (closed, 2024): Innsbruck: ordinary bike routed over mtb:scale=2 path (also 47.211323,11.333352 -> 47.221799,11.367835 with mtb:scale=3)
+
+point=47.275433,11.368286&point=47.273794,11.369584
+  &profile=bike
+  distance>230m
+  comment=TODO #3068 (closed, 2024): Innsbruck: way 1087976687 with smoothness=impassable used
+
+point=47.058145,10.963428&point=47.050807,10.9651
+  &profile=bike
+  distance>900m
+  comment=#3078 (closed, 2024): pushing section through forbidden access takes 3 min vs 10 min walking, pushing must not be faster than walking
+
+point=47.540674,14.917928&point=47.541128,14.919523
+  &profile=racingbike
+  distance<150m
+  comment=#3370 (closed, 2026): bridge elevation correction created a steep spike which is excluded -> detour for racingbike
+
+point=47.395673,15.160168&point=47.396893,15.164878
+  &profile=racingbike
+  distance<385m
+  comment=#3386 (closed, 2026): wrong shortcut/detour fixed by simplified racingbike priority (also 47.741086,15.310372 -> 47.741103,15.307773; 47.40979,15.274089 -> 47.406505,15.269758)
+
+point=47.40608,15.262696&point=47.404806,15.25618
+  &profile=racingbike
+  distance<530m
+  comment=#3386 (closed, 2026): wrong shortcut/detour fixed by simplified racingbike priority
+
+point=47.437422,15.282319&point=47.410845,15.273828
+  &profile=racingbike
+  distance<3670m
+  comment=#3387 (closed, 2026): bicycle infrastructure too strongly preferred for racingbike, fixed (also 47.630049,15.658982 -> 47.674609,15.489342; 47.40398,15.224011 -> 47.381216,15.10702)
+
+point=47.052146,16.082349&point=47.065988,16.034605
+  &profile=racingbike
+  distance<4.3km
+  comment=#3387 (closed, 2026): after fix identical to brouter fastbike

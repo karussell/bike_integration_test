@@ -1,0 +1,9 @@
+point=49.868827,8.477014&point=49.868426,8.473713
+  &profile=bike
+  distance>1.1km
+  comment=#2400 (closed, 2021): two barrier=yes + access=no nodes are passed (reported for foot, barrier applies to bike)
+
+point=50.111413,8.446008&point=50.111371,8.446165
+  &profile=bike
+  distance<20m
+  comment=#2757 (closed, 2023): barrier=gate with foot=yes bicycle=yes locked=yes: bike detours while foot passes

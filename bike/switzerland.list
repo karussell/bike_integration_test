@@ -1,3 +1,8 @@
 point=47.37,8.54&point=47.189,8.253
   &profile=bike
   ascend<700m
+
+point=47.36370,8.53172&point=47.36006,8.53396
+  &profile=bike
+  distance<535m
+  comment=#1255 (closed, 2018): Zuerich: oneway open for bicycles in both directions but GH did not route against it (opposite direction fine)

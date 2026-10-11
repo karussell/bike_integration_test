@@ -1,0 +1,9 @@
+point=54.404198,18.624522&point=54.406793,18.626314
+  &profile=bike
+  distance<315m
+  comment=#3014 (closed, 2024): Gdansk: tertiary preferred over footway bicycle=yes (speed 10) giving strange route (#3015 example 1 same points)
+
+point=53.728202,17.508648&point=53.726755,17.511033
+  &profile=bike
+  distance<230m
+  comment=#3029 (closed, 2024): living_street avoided by bike/mtb (pushing speed), racingbike routes fine

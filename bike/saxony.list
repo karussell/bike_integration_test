@@ -43,3 +43,59 @@ point=50.845805%2C13.11945&point=50.846409%2C13.069372
   &profile=bike
   ascend<70m
   comment=should not go over extreme hill
+
+point=51.03454,13.771749&point=51.04161,13.753145
+  &profile=bike
+  distance<1700m
+  comment=#1113 (closed, 2017): Dresden Grosser Garten: highway=pedestrian + bicycle=yes should be taken directly through the park
+
+point=51.419138,14.227558&point=51.414032,14.230755
+  &profile=bike
+  distance<622m
+  comment=#2631 (closed, 2022): uses hazmat secondary instead of the cyclepath; paving_stones must be 16 km/h not 12 (same route in #2840)
+
+point=50.916252,14.161785&point=50.890473,14.231415
+  &profile=bike
+  ascend<30m
+  comment=#2634 (closed, 2022): should be very smooth with small ascend
+
+point=50.986072,13.823408&point=50.98387,13.834759
+  &profile=bike
+  distance<860m
+  comment=#2840 (closed, 2023): hazmat handling causes a short unhelpful detour off the secondary
+
+point=51.099724,13.679337&point=51.102439,13.681118
+  &profile=bike
+  distance<0.6km
+  comment=#3280 (closed, 2026): living_street detour 820 m instead of 420 m, allow higher speed if explicitly allowed
+
+point=51.193154,13.362408&point=51.195171,13.374167
+  &profile=bike
+  distance<1.2km
+  comment=#3301 (closed, 2026): detour and more dangerous route because way 229899458 gets double penalty (dismount + bad smoothness)
+
+point=51.19367,13.388138&point=51.19464,13.395275
+  &profile=bike
+  distance<600m
+  comment=#3313 (closed, 2026): highway=cycleway with access=agricultural (way 89482973) wrongly excluded
+
+point=51.311405,14.545808&point=51.308449,14.544617
+  &profile=bike
+  ascend<3m
+  comment=#3362 (closed, 2026): Neudorf bridge: elevation of bridge entry nodes disturbed, profile should be smooth
+
+point=50.854344,13.113826&point=50.856442,13.112572
+  &profile=bike
+  ascend<2m
+  descend<13m
+  comment=#3362 (closed, 2026): Floeha inclined bridges: elevation 4m/14m before, 1m/12m after fix, still not smooth
+
+point=51.17958,14.390842&point=51.179635,14.394708
+  &profile=racingbike
+  distance<275m
+  comment=#3375 (closed, 2026): pushing section with bicycle=yes must not get PREFER for racingbike
+
+point=50.773908,12.977742&point=50.774088,12.978116
+  &profile=bike
+  distance<40m
+  comment=#3412 (closed, 2026): Chemnitz: reverse-oneway penalty 0.2 too strong (also 50.620321,12.302441 -> 50.620307,12.302793; 51.023348,13.705393 -> 51.023104,13.704681)

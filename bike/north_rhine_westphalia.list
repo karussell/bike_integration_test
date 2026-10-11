@@ -1,0 +1,19 @@
+point=51.130653,7.025601&point=51.129593,7.024748
+  &profile=bike
+  distance>135m
+  comment=#1098 (closed, 2017): bike uses bridges with bicycle=no
+
+point=51.25745,7.14858&point=51.25727,7.14617
+  &profile=bike
+  distance>300m
+  comment=#1498 (closed, 2018): bike routed over highway=pedestrian way 180247410 without bicycle=yes
+
+point=51.664251,7.079626&point=51.666613,7.078371
+  &profile=bike
+  distance<300m
+  comment=#2074 (closed, 2020): should go straight on the road with cycleway=lane tag instead of detour via residential
+
+point=50.7897,6.0958&point=50.7872,6.0932
+  &profile=bike
+  distance<350m
+  comment=#2969 (closed, 2024): Aachen: primary with cycleway:right=lane + cycleway:left=no gets BAD priority -> gas station detour; should stay on primary

@@ -27,7 +27,7 @@ UNITS = {'': 1, 'm': 1, 'km': 1000, 's': 1, 'min': 60, 'h': 3600}
 RADIUS = 10  # m, for contains/avoids
 HERE = os.path.dirname(os.path.abspath(__file__))
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
-COLORS = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'BOLD': '1'}
+COLORS = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'WARN': '33', 'BOLD': '1'}
 
 
 def col(c, txt):
@@ -132,6 +132,8 @@ def get(args, path, query):
 
 
 def run(t, args, details):
+    if not (t['checks'] or t['contains'] or t['avoids']):
+        return 'ERROR', ['no assertion'], {}
     try:
         res = get(args, 'route', t['query'] + '&points_encoded=false&instructions=false' + ''.join('&details=' + d for d in details))
     except urllib.error.HTTPError as e:
@@ -194,9 +196,15 @@ def run_all(args):
 
 def compare(base_file, new_file, verbose):
     base = {r['src']: r for r in map(json.loads, open(base_file))}
+    new = [json.loads(l) for l in open(new_file)]
     diff = {'fixed': 0, 'now broken': 0, 'still failing': 0}
     print(f'{new_file} compared to {base_file}:')
-    for r in map(json.loads, open(new_file)):
+    per_file = lambda rows: {f: sum(r['src'].rsplit(':', 1)[0] == f for r in rows) for f in {r['src'].rsplit(':', 1)[0] for r in rows}}
+    nb, nn = per_file(base.values()), per_file(new)
+    for f in sorted(nb.keys() | nn.keys()):
+        if nb.get(f, 0) != nn.get(f, 0):
+            print(col('WARN', f'warning: {f} has {nb.get(f, 0)} cases in {base_file} but {nn.get(f, 0)} in {new_file}'))
+    for r in new:
         b = base.get(r['src'])
         if not b:
             continue
@@ -211,7 +219,8 @@ def compare(base_file, new_file, verbose):
             print('              ' + r.get('query', ''))
         for msg in r['fails']:
             print('              ' + col(r['status'], msg))
-    print(' '.join(f'{k}={v}' for k, v in diff.items()))
+    passed = lambda rows: sum(r['status'] == 'PASS' for r in rows)
+    print(' '.join(f'{k}={v}' for k, v in diff.items()) + f' | passed {passed(base.values())}/{len(base)} -> {passed(new)}/{len(new)}')
 
 
 def main():

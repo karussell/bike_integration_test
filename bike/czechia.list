@@ -1,0 +1,4 @@
+point=50.043664,14.403779&point=50.045669,14.407192
+  &profile=bike
+  distance>400m
+  comment=TODO #3344 (closed, 2026): Prague: bicycle=destination + motor_vehicle=destination ignored, brouter/mapy avoid the street

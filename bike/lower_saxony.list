@@ -1,0 +1,14 @@
+point=52.3737,9.716227&point=52.366035,9.721806
+  &profile=racingbike
+  distance<1km
+  comment=#2357 (closed, 2021): Hannover: racingbike behaves as if the path did not exist, bike uses it
+
+point=52.423377,9.444177&point=52.424113,9.451455
+  &profile=bike
+  distance<520m
+  comment=#2694 (closed, 2022): primary oneway with cycleway:right=track + cycleway:right:oneway=no: bike must be able to go against the oneway
+
+point=52.368569,9.721531&point=52.369329,9.721137
+  &profile=mtb
+  distance<90m
+  comment=#3217 (closed, 2025): Hannover: mtb route network inconsistency causes unnecessary detour

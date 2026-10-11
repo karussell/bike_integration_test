@@ -1,0 +1,44 @@
+point=49.384608,-121.447678&point=49.361582,-121.343307
+  &profile=bike
+  contains=49.369085,-121.403114
+  comment=#191 (closed, 2014): bike routed over a motorway in Canada (also -32.262459,152.325096 -> -32.100026,152.377625 in AU)
+
+point=40.796968%2C-73.960954&point=40.765266%2C-73.982792
+  &profile=bike
+  distance>4500m
+  comment=#1423 (closed, 2018): NYC: prefers way 195743153 whose cycleway:right runs the wrong direction over real cycleway 368002781; priority must be per direction
+
+point=40.765266%2C-73.982792&point=40.796968%2C-73.960954
+  &profile=bike
+  distance<4400m
+  comment=#1423 (closed, 2018): ..
+
+point=40.7773,-124.1419&point=40.8013,-124.1623
+  &profile=bike
+  contains=40.784975,-124.158978
+  comment=TODO #1500 (open, 2018): Eureka CA: zigzag route, should prefer way 475214968 with cycleway=lane; turn costs improve it
+
+point=-32.0558,115.7258&point=-31.9957,115.5436
+  &profile=bike
+  time<2h
+  comment=#2720 (closed, 2023): Rottnest ferry: bike 3:07 vs foot 3:44, duration of ferry relation 9083692 ignored
+
+point=50.45259%2C4.57512&point=50.441932%2C4.551656
+  &profile=bike
+  distance>3500m
+  comment=#3259 highway=trunk should not be used
+
+point=37.771237,-122.454767&point=37.770946,-122.456489
+  &profile=bike
+  time<2min
+  comment=#3028 (closed, 2024): San Francisco: wrong default/pushing speed for path and footway led to bad route
+
+point=22.410168,114.212777&point=22.410274,114.212895
+  &profile=bike
+  distance<0.1km
+  comment=#3289 (closed, 2026): Hong Kong: barrier=bollard access=yes blocks bike, 5.3 km detour instead of 10 m crossing
+
+point=45.431582,-75.708373&point=45.429042,-75.701005
+  &profile=bike
+  time<5min
+  comment=#3383 (closed, 2026): Ottawa Alexandra bridge: surface=wood too slow (4 km/h), bike turns back to the road, 650 m takes 9 min; expected bike path ~2 min
