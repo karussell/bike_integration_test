@@ -145,6 +145,10 @@ def main():
         return compare(*args.compare, args.verbose, col)
     if not args.host:
         ap.error('HOST or --compare BASE NEW required')
+    try:
+        out = open(args.save, 'w') if args.save else None
+    except OSError as e:
+        sys.exit(f'cannot write {args.save}: {e.strerror}')
     try:  # request only the path details the server knows
         evs = json.load(urllib.request.urlopen(f"{args.host.rstrip('/')}/info" + (f'?key={args.key}' if args.key else ''), timeout=30))['encoded_values']
         args.details = [d for d in DETAILS if d in evs]
@@ -158,7 +162,8 @@ def main():
     for t in tests:
         status, msgs, m = run(t, args)
         counts[status] += 1
-        rows.append({'src': t['src'], 'status': status, 'metrics': {k: fmt(k, v) for k, v in m.items()}, 'fails': msgs})
+        rows.append({'src': t['src'], 'query': t['query'].split('&profile')[0].replace('%2C', ','), 'status': status,
+                     'metrics': {k: fmt(k, v) for k, v in m.items()}, 'fails': msgs})
         if t['src'].split(':')[0] != cur:
             cur = t['src'].split(':')[0]
             print(nl + col('BOLD', f"{cur} ({sum(x['src'].startswith(cur + ':') for x in tests)})") + ' ', end='', flush=True)
@@ -176,8 +181,8 @@ def main():
         print(*('      ' + col(status, msg) for msg in msgs), sep='\n', end='' if not msgs else '\n')
     print(nl + col('PASS', f"passed={counts['PASS']}") + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}")
           + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}"))
-    if args.save:
-        open(args.save, 'w').write(''.join(json.dumps(r) + '\n' for r in rows))
+    if out:
+        out.write(''.join(json.dumps(r) + '\n' for r in rows))
     sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
 
 
@@ -194,7 +199,9 @@ def compare(base_file, new_file, verbose, col):
             continue
         diff[kind] = diff.get(kind, 0) + 1
         print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:22} "
-              + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v))
+              + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v and kind != 'fixed'))
+        if kind in ('broken', 'still failing'):
+            print('              ' + r.get('query', ''))
         for msg in r['fails']:
             print('              ' + col(r['status'], msg))
     print(' '.join(f'{k}={v}' for k, v in diff.items()))
