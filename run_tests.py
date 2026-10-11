@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run *.list route test cases against a GraphHopper /route endpoint.
 
-usage: run_tests.py HOST [--key KEY] [-v] [--no-color] [--save OUT] [FILE.list ...]
+usage: run_tests.py HOST [DIR|FILE.list ...] [--key KEY] [-v] [--no-color] [--save OUT]
        run_tests.py --compare BASE.jsonl NEW.jsonl [-v]
   HOST  base URL, e.g. https://graphhopper.com/api/1 or https://biketest.graphhopper.org
-  FILE  default: all *.list next to this script
+  DIR   profile folder with *.list files, e.g. bike; default: all */*.list next to this script
   --save OUT  write one JSON line per test (status, metrics, fails); plain `diff` works on two such files
   --compare   list fixed/broken/still failing tests of NEW against BASE (-v: also passing tests with changed metrics)
 
@@ -25,6 +25,7 @@ LTS1 = {'cycleway', 'path', 'footway', 'pedestrian', 'living_street', 'bridleway
 DETAILS = ['road_class', 'cycleway', 'urban_density', 'bike_network']
 UNITS = {'': 1, 'm': 1, 'km': 1000, 's': 1, 'min': 60, 'h': 3600}
 RADIUS = 10  # m, for contains/avoids
+HERE = os.path.dirname(os.path.abspath(__file__))
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
 
 
@@ -57,7 +58,7 @@ def load(path):
     tests = []
     for block in re.split(r'\n\s*\n', open(path).read().strip()):
         lines = [l.strip() for l in block.split('\n')]
-        t = {'src': f'{os.path.basename(path)}:{len(tests) + 1}', 'query': lines[0], 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
+        t = {'src': f'{os.path.relpath(path, HERE)}:{len(tests) + 1}', 'query': lines[0], 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
         for l in lines[1:]:
             try:
                 parse_line(t, l)
@@ -154,7 +155,9 @@ def main():
         args.details = [d for d in DETAILS if d in evs]
     except Exception:
         args.details = DETAILS
-    files = args.files or sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), '*.list')))
+    files = [f for p in (args.files or [HERE]) for f in (sorted(glob.glob(os.path.join(p, '*', '*.list')) or glob.glob(os.path.join(p, '*.list'))) if os.path.isdir(p) else [p])]
+    if not files:
+        sys.exit(f'no *.list files found in {args.files or [HERE]}')
     tests = [t for f in files for t in load(f)]
     counts = {'PASS': 0, 'FAIL': 0, 'ERROR': 0}
     print(f'{args.host}: {len(tests)} tests from {len(files)} files')
@@ -172,7 +175,7 @@ def main():
             print(col('PASS', '.'), end='', flush=True)
             nl = '\n'
             continue
-        print(nl + col(status, f'{status:5}') + f" {t['src']:22} {t['query'].split('&profile')[0].replace('%2C', ',')}")
+        print(nl + col(status, f'{status:5}') + f" {t['src']:27} {t['query'].split('&profile')[0].replace('%2C', ',')}")
         nl = ''
         if status == 'FAIL' and t['comment']:
             print('      # ' + t['comment'])
@@ -198,7 +201,7 @@ def compare(base_file, new_file, verbose, col):
         if kind == 'pass' and not verbose:
             continue
         diff[kind] = diff.get(kind, 0) + 1
-        print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:22} "
+        print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:27} "
               + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v and kind != 'fixed'))
         if kind in ('now broken', 'still failing'):
             print('              ' + r.get('query', ''))
