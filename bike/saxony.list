@@ -1,45 +1,45 @@
 point=51.196964%2C13.309157&point=51.195156%2C13.374142
-  profile=bike
+  &profile=bike
   contains=51.186047,13.33314;51.192417,13.359429
   distance=5.5km-6.5km
   time=20m-22m
   comment=avoid secondary even if hilly detour
 
 point=51.108047%2C13.676413&point=51.108573%2C13.65899
-  profile=bike
+  &profile=bike
   contains=51.107602,13.664856
   distance<1400m
   time=4m
   comment=avoid detour along official bike route on hill
 
 point=51.152741%2C13.16885&point=51.148501%2C13.14902
-  profile=bike
+  &profile=bike
   contains=51.149606,13.154488
   distance<1650m
   comment=do not aggressively avoid bad surface
 
 point=51.154537%2C13.560253&point=51.369074%2C12.351513
-  profile=bike
+  &profile=bike
   distance<118km
   ascend<700
   low_stress_part>75
   bike_network_part>70
 
 point=51.220032%2C14.318474&point=51.22036%2C14.337929
-  profile=bike
+  &profile=bike
   distance<1400m
 
 point=51.560178%2C13.009727&point=51.593463%2C12.58847
-  profile=bike
+  &profile=bike
   bike_network_part>65
   low_stress_part>90
 
 point=51.212043%2C14.474803&point=51.238134%2C14.518668
-  profile=bike
+  &profile=bike
   bike_network_part>90
   comment=avoid shorter route on secondary
 
 point=50.845805%2C13.11945&point=50.846409%2C13.069372
-  profile=bike
+  &profile=bike
   ascend<70m
   comment=should not go over extreme hill

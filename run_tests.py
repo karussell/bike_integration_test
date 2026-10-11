@@ -9,8 +9,8 @@ usage: run_tests.py HOST [DIR|FILE.list ...] [--key KEY] [-v] [--no-color] [--sa
   --compare   list fixed/broken/still failing tests of NEW against BASE (-v: also passing tests with changed metrics)
 
 Test case format (blocks separated by blank lines):
-  point=lat,lon&point=lat,lon[&any=query&params]   first line, raw /route query string
-  profile=bike
+  point=lat,lon&point=lat,lon   first line, raw /route query string
+  &profile=bike                 lines starting with & are appended to the query string
   distance<1400m | distance=5.5km-6.5km | time<56min | time=9h30m-10h30m | ascend<100m | descend>...
   low_stress_part>75        % of distance with bike LTS 1-2 as in graphhopper-maps (road_class, cycleway, urban_density)
   bike_network_part>70      % of distance with bike_network != missing
@@ -22,11 +22,16 @@ Operators: <, <=, >, >=, =range (a-b) or =single value (±10 %).
 import argparse, glob, json, math, operator, os, re, sys, urllib.request
 
 LTS1 = {'cycleway', 'path', 'footway', 'pedestrian', 'living_street', 'bridleway', 'track', 'corridor'}
-DETAILS = ['road_class', 'cycleway', 'urban_density', 'bike_network']
+DETAILS = {'road_class': 'other', 'cycleway': 'missing', 'urban_density': 'residential', 'bike_network': 'missing'}  # with defaults
 UNITS = {'': 1, 'm': 1, 'km': 1000, 's': 1, 'min': 60, 'h': 3600}
 RADIUS = 10  # m, for contains/avoids
 HERE = os.path.dirname(os.path.abspath(__file__))
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
+COLORS = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'BOLD': '1'}
+
+
+def col(c, txt):
+    return f'\033[{COLORS[c]}m{txt}\033[0m' if c in COLORS and col.on else txt
 
 
 def num(key, s):
@@ -42,11 +47,14 @@ def num(key, s):
 
 
 def parse_line(t, l):
+    if l.startswith('&'):
+        t['query'] += l
+        return
     k, op, v = re.fullmatch(r'(\w+)\s*(<=|>=|<|>|=)\s*(.*)', l).groups()
-    if k in ('comment', 'contains', 'avoids'):
-        t[k] = v if k == 'comment' else [tuple(map(float, p.split(','))) for p in v.split(';')]
-    elif k == 'profile':
-        t['query'] += '&profile=' + v
+    if k in ('contains', 'avoids'):
+        t[k] = [tuple(map(float, p.split(','))) for p in v.split(';')]
+    elif k == 'comment':
+        t[k] = v
     elif op != '=':
         t['checks'].append((k, op, num(k, v), v))
     else:  # range a-b or single value ±10 %
@@ -58,7 +66,8 @@ def load(path):
     tests = []
     for block in re.split(r'\n\s*\n', open(path).read().strip()):
         lines = [l.strip() for l in block.split('\n')]
-        t = {'src': f'{os.path.relpath(path, HERE)}:{len(tests) + 1}', 'query': lines[0], 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
+        t = {'file': os.path.relpath(path, HERE), 'src': f'{os.path.relpath(path, HERE)}:{len(tests) + 1}', 'query': lines[0],
+             'points': lines[0].replace('%2C', ','), 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
         for l in lines[1:]:
             try:
                 parse_line(t, l)
@@ -66,6 +75,13 @@ def load(path):
                 sys.exit(f"{t['src']}: cannot parse {l!r} ({e})")
         tests.append(t)
     return tests
+
+
+def list_files(paths):
+    files = []
+    for p in paths:
+        files += sorted(glob.glob(os.path.join(p, '*', '*.list')) or glob.glob(os.path.join(p, '*.list'))) if os.path.isdir(p) else [p]
+    return files or sys.exit(f'no *.list files found in {paths}')
 
 
 def xy(lon, lat, ref_lat):  # local equirectangular projection in metres
@@ -95,7 +111,7 @@ def metrics(path):
     pts = path['points']['coordinates']
     seg = [math.dist(xy(*a, a[1]), xy(*b, a[1])) for a, b in zip(pts, pts[1:])]
     per_seg = lambda name, default: [v for i, j, v in path['details'].get(name, [(0, len(seg), default)]) for _ in range(j - i)]
-    rc, cw, ud, bn = (per_seg(n, d) for n, d in zip(DETAILS, ('other', 'missing', 'residential', 'missing')))  # order as DETAILS
+    rc, cw, ud, bn = (per_seg(n, d) for n, d in DETAILS.items())
     part = lambda ok: 100 * sum(d for d, o in zip(seg, ok) if o) / sum(seg)
     return {'distance': path['distance'], 'time': path['time'] / 1000, 'ascend': path.get('ascend', 0), 'descend': path.get('descend', 0),
             'low_stress_part': part(bike_lts(r, c, u == 'rural') <= 2 for r, c, u in zip(rc, cw, ud)),
@@ -110,10 +126,14 @@ def fmt(k, x):
     return f'{x:.0f}' + ('m' if k in ('ascend', 'descend') else '%')
 
 
-def run(t, args):
-    url = f"{args.host.rstrip('/')}/route?{t['query']}&points_encoded=false&instructions=false" + ''.join('&details=' + d for d in args.details)
+def get(args, path, query):
+    url = f"{args.host.rstrip('/')}/{path}?{query}" + (f'&key={args.key}' if args.key else '')
+    return json.load(urllib.request.urlopen(url, timeout=60))
+
+
+def run(t, args, details):
     try:
-        res = json.load(urllib.request.urlopen(url + (f'&key={args.key}' if args.key else ''), timeout=60))
+        res = get(args, 'route', t['query'] + '&points_encoded=false&instructions=false' + ''.join('&details=' + d for d in details))
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors='replace')
         return 'ERROR', [f'HTTP {e.code}: ' + (json.loads(body).get('message', body) if body.startswith('{') else body)[:200]], {}
@@ -130,6 +150,70 @@ def run(t, args):
     return ('FAIL' if fails else 'PASS'), fails, m
 
 
+def run_all(args):
+    try:
+        if args.save:
+            os.makedirs(os.path.dirname(args.save) or '.', exist_ok=True)
+        out = open(args.save, 'w') if args.save else None
+    except OSError as e:
+        sys.exit(f'cannot write {args.save}: {e.strerror}')
+    try:  # request only the path details the server knows
+        details = [d for d in DETAILS if d in get(args, 'info', '')['encoded_values']]
+    except Exception:
+        details = list(DETAILS)
+    files = list_files(args.files or [HERE])
+    tests = [t for f in files for t in load(f)]
+    counts, rows, cur, nl = {'PASS': 0, 'FAIL': 0, 'ERROR': 0}, [], None, ''  # nl: newline needed before the next full line
+    print(f'{args.host}: {len(tests)} tests from {len(files)} files')
+    for t in tests:
+        status, msgs, m = run(t, args, details)
+        counts[status] += 1
+        rows.append({'src': t['src'], 'query': t['points'], 'status': status, 'metrics': {k: fmt(k, v) for k, v in m.items()}, 'fails': msgs})
+        if t['file'] != cur:
+            cur = t['file']
+            print(nl + col('BOLD', f"{cur} ({sum(x['file'] == cur for x in tests)})") + ' ', end='', flush=True)
+            nl = '\n'
+        if status == 'PASS' and not args.verbose:
+            print(col('PASS', '.'), end='', flush=True)
+            nl = '\n'
+            continue
+        print(nl + col(status, f'{status:5}') + f" {t['src']:27} {t['points']}")
+        nl = ''
+        if status == 'FAIL' and t['comment']:
+            print('      # ' + t['comment'])
+        if m:
+            print('      ' + ' '.join(f'{k}={fmt(k, v)}' for k, v in m.items()))
+        for msg in msgs:
+            print('      ' + col(status, msg))
+    print(nl + col('PASS', f"passed={counts['PASS']}") + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}")
+          + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}"))
+    if out:
+        out.write(''.join(json.dumps(r) + '\n' for r in rows))
+    sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
+
+
+def compare(base_file, new_file, verbose):
+    base = {r['src']: r for r in map(json.loads, open(base_file))}
+    diff = {'fixed': 0, 'now broken': 0, 'still failing': 0}
+    print(f'{new_file} compared to {base_file}:')
+    for r in map(json.loads, open(new_file)):
+        b = base.get(r['src'])
+        if not b:
+            continue
+        ok_before, ok_now = b['status'] == 'PASS', r['status'] == 'PASS'
+        kind = 'pass' if ok_before and ok_now else 'fixed' if ok_now else 'now broken' if ok_before else 'still failing'
+        if kind == 'pass' and not verbose:
+            continue
+        diff[kind] = diff.get(kind, 0) + 1
+        changed = '' if kind == 'fixed' else ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v)
+        print(col('PASS' if ok_now else 'FAIL', f'{kind:13}') + f" {r['src']:27} {changed}")
+        if not ok_now:
+            print('              ' + r.get('query', ''))
+        for msg in r['fails']:
+            print('              ' + col(r['status'], msg))
+    print(' '.join(f'{k}={v}' for k, v in diff.items()))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('host', nargs='?')
@@ -140,74 +224,13 @@ def main():
     ap.add_argument('--save', metavar='OUT')
     ap.add_argument('--compare', nargs=2, metavar=('BASE', 'NEW'))
     args = ap.parse_args()
-    color = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'BOLD': '1'} if sys.stdout.isatty() and not args.no_color else {}
-    col = lambda c, txt: f'\033[{color[c]}m{txt}\033[0m' if c in color else txt
+    col.on = sys.stdout.isatty() and not args.no_color
     if args.compare:
-        return compare(*args.compare, args.verbose, col)
+        missing = [f for f in args.compare if not os.path.isfile(f)]
+        return compare(*args.compare, args.verbose) if not missing else sys.exit(f'no such file: {missing[0]}')
     if not args.host:
         ap.error('HOST or --compare BASE NEW required')
-    try:
-        out = open(args.save, 'w') if args.save else None
-    except OSError as e:
-        sys.exit(f'cannot write {args.save}: {e.strerror}')
-    try:  # request only the path details the server knows
-        evs = json.load(urllib.request.urlopen(f"{args.host.rstrip('/')}/info" + (f'?key={args.key}' if args.key else ''), timeout=30))['encoded_values']
-        args.details = [d for d in DETAILS if d in evs]
-    except Exception:
-        args.details = DETAILS
-    files = [f for p in (args.files or [HERE]) for f in (sorted(glob.glob(os.path.join(p, '*', '*.list')) or glob.glob(os.path.join(p, '*.list'))) if os.path.isdir(p) else [p])]
-    if not files:
-        sys.exit(f'no *.list files found in {args.files or [HERE]}')
-    tests = [t for f in files for t in load(f)]
-    counts = {'PASS': 0, 'FAIL': 0, 'ERROR': 0}
-    print(f'{args.host}: {len(tests)} tests from {len(files)} files')
-    cur, nl, rows = None, '', []  # nl = newline needed before the next full line
-    for t in tests:
-        status, msgs, m = run(t, args)
-        counts[status] += 1
-        rows.append({'src': t['src'], 'query': t['query'].split('&profile')[0].replace('%2C', ','), 'status': status,
-                     'metrics': {k: fmt(k, v) for k, v in m.items()}, 'fails': msgs})
-        if t['src'].split(':')[0] != cur:
-            cur = t['src'].split(':')[0]
-            print(nl + col('BOLD', f"{cur} ({sum(x['src'].startswith(cur + ':') for x in tests)})") + ' ', end='', flush=True)
-            nl = '\n'
-        if status == 'PASS' and not args.verbose:
-            print(col('PASS', '.'), end='', flush=True)
-            nl = '\n'
-            continue
-        print(nl + col(status, f'{status:5}') + f" {t['src']:27} {t['query'].split('&profile')[0].replace('%2C', ',')}")
-        nl = ''
-        if status == 'FAIL' and t['comment']:
-            print('      # ' + t['comment'])
-        if m:
-            print('      ' + ' '.join(f'{k}={fmt(k, v)}' for k, v in m.items()))
-        print(*('      ' + col(status, msg) for msg in msgs), sep='\n', end='' if not msgs else '\n')
-    print(nl + col('PASS', f"passed={counts['PASS']}") + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}")
-          + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}"))
-    if out:
-        out.write(''.join(json.dumps(r) + '\n' for r in rows))
-    sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
-
-
-def compare(base_file, new_file, verbose, col):
-    base = {r['src']: r for r in map(json.loads, open(base_file))}
-    diff = {'fixed': 0, 'now broken': 0, 'still failing': 0}
-    print(f'{new_file} compared to {base_file}:')
-    for r in map(json.loads, open(new_file)):
-        b = base.get(r['src'])
-        if not b:
-            continue
-        kind = ('fixed' if r['status'] == 'PASS' else 'still failing') if b['status'] != 'PASS' else ('now broken' if r['status'] != 'PASS' else 'pass')
-        if kind == 'pass' and not verbose:
-            continue
-        diff[kind] = diff.get(kind, 0) + 1
-        print(col('PASS' if kind in ('fixed', 'pass') else 'FAIL', f'{kind:13}') + f" {r['src']:27} "
-              + ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v and kind != 'fixed'))
-        if kind in ('now broken', 'still failing'):
-            print('              ' + r.get('query', ''))
-        for msg in r['fails']:
-            print('              ' + col(r['status'], msg))
-    print(' '.join(f'{k}={v}' for k, v in diff.items()))
+    run_all(args)
 
 
 if __name__ == '__main__':

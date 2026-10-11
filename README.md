@@ -10,11 +10,11 @@ expected values
 # List Format
 
 One test case per block, blocks separated by blank lines. The first line is the raw `/route` query string,
-every further line is one assertion (except profile which is added to the query string):
+every further line is one assertion. Lines starting with `&` are appended to the query string, `comment` is printed on failure:
 
 ```
 point=51.196964,13.309157&point=51.195156,13.374142
-  profile=bike
+  &profile=bike
   distance=5.5km-6.5km
   time=20m-22m
   ascend<100m
@@ -27,8 +27,8 @@ point=51.196964,13.309157&point=51.195156,13.374142
 
 | key | meaning |
 |---|---|
-| `point=...&point=...` | first line, passed as is to `/route`; extra params like `&power=140` are allowed |
-| `profile=bike` | appended to the query |
+| `point=...&point=...` | first line, passed as is to `/route` |
+| `&profile=bike`, `&power=140` | lines starting with `&` are appended to the query string |
 | `distance`, `time`, `ascend`, `descend` | distance in `m`/`km`, time in `h`/`m`/`min`/`s` (unit required for distance and time), ascend/descend in m |
 | `low_stress_part` | % of distance with bike LTS 1-2 as in graphhopper-maps (road_class, cycleway, urban_density) |
 | `bike_network_part` | % of distance with `bike_network != missing` |
