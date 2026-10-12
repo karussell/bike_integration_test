@@ -35,6 +35,7 @@ point=51.196964,13.309157&point=51.195156,13.374142
 | `contains=lat,lon;lat,lon` | route passes within 10 m of each point |
 | `avoids=lat,lon;lat,lon` | route stays more than 10 m away from each point |
 | `comment=...` | printed when the case fails |
+| `skip=true` | case is not run and listed as SKIP, compare ignores it; a `comment` explaining why is required |
 
 Operators: `<`, `<=`, `>`, `>=`, `=a-b` (inclusive range) or `=value` (±10 %).
 

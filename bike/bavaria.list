@@ -48,3 +48,8 @@ point=50.028932%2C11.566588&point=50.029894%2C11.564682
   &profile=bike
   distance<180m
   comment=avoid short detour
+
+point=47.482017%2C11.239936&point=47.431504%2C11.262132
+  &profile=bike
+  distance>8km
+  comment=very tricky case but avoiding secondary (maxspeed=100) without cycleway and no shoulder and not wide is too expensive here (6km longer)

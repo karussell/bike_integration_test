@@ -20,6 +20,7 @@ Test case format (blocks separated by blank lines):
   contains=lat,lon;lat,lon  route passes within 10 m of each point
   avoids=lat,lon;lat,lon    route stays more than 10 m away from each point
   comment=...               printed on failure
+  skip=true                 do not run this case (a comment explaining why is required); compare ignores it
 Operators: <, <=, >, >=, =range (a-b) or =single value (±10 %).
 """
 import argparse, glob, json, math, operator, os, re, sys, urllib.request
@@ -30,7 +31,7 @@ UNITS = {'': 1, 'm': 1, 'km': 1000, 's': 1, 'min': 60, 'h': 3600}
 RADIUS = 10  # m, for contains/avoids
 HERE = os.path.dirname(os.path.abspath(__file__))
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge}
-COLORS = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'WARN': '33', 'BOLD': '1'}
+COLORS = {'FAIL': '31', 'ERROR': '35', 'PASS': '32', 'SKIP': '33', 'WARN': '33', 'BOLD': '1'}
 OUT = 'OUT_OF_BBOX'
 
 
@@ -59,6 +60,8 @@ def parse_line(t, l):
         t[k] = [tuple(map(float, p.split(','))) for p in v.split(';')]
     elif k == 'comment':
         t[k] = v
+    elif k == 'skip':
+        t[k] = v == 'true'
     elif op != '=':
         t['checks'].append((k, op, num(k, v), v))
     else:  # range a-b or single value ±10 %
@@ -71,13 +74,15 @@ def load(path):
     for block in re.split(r'\n\s*\n', open(path).read().strip()):
         lines = [l.strip() for l in block.split('\n')]
         t = {'file': os.path.relpath(path, HERE), 'src': f'{os.path.relpath(path, HERE)}:{len(tests) + 1}', 'query': lines[0],
-             'points': lines[0].replace('%2C', ','), 'checks': [], 'contains': [], 'avoids': [], 'comment': ''}
+             'points': lines[0].replace('%2C', ','), 'checks': [], 'contains': [], 'avoids': [], 'comment': '', 'skip': False}
         t['coords'] = [tuple(map(float, c)) for c in re.findall(r'point=(-?[\d.]+),(-?[\d.]+)', t['points'])]
         for l in lines[1:]:
             try:
                 parse_line(t, l)
             except (AttributeError, KeyError, ValueError) as e:
                 sys.exit(f"{t['src']}: cannot parse {l!r} ({e})")
+        if t['skip'] and not t['comment']:
+            sys.exit(f"{t['src']}: skip=true requires a comment explaining why")
         tests.append(t)
     return tests
 
@@ -142,6 +147,8 @@ def get(args, path, query):
 
 
 def run(t, args, details, bbox):
+    if t['skip']:
+        return 'SKIP', [], {}
     if not (t['checks'] or t['contains'] or t['avoids']):
         return 'ERROR', ['no assertion'], {}
     if bbox and any(not (bbox[1] <= lat <= bbox[3] and bbox[0] <= lon <= bbox[2]) for lat, lon in t['coords']):
@@ -178,7 +185,7 @@ def run_all(args):
         details, bbox = list(DETAILS), None
     files = list_files(args.files or [HERE], args.skip)
     tests = [t for f in files for t in load(f)]
-    counts, rows, cur, nl = {'PASS': 0, 'FAIL': 0, 'ERROR': 0, OUT: 0}, [], None, ''  # nl: newline needed before the next full line
+    counts, rows, cur, nl = {'PASS': 0, 'FAIL': 0, 'ERROR': 0, OUT: 0, 'SKIP': 0}, [], None, ''  # nl: newline needed before the next full line
     print(f'{args.host}: {len(tests)} tests from {len(files)} files')
     for t in tests:
         status, msgs, m = run(t, args, details, bbox)
@@ -194,14 +201,15 @@ def run_all(args):
             continue
         print(nl + col(status, f'{status:5}') + f" {t['src']:27} {t['points']}")
         nl = ''
-        if status == 'FAIL' and t['comment']:
+        if status in ('FAIL', 'SKIP') and t['comment']:
             print('      # ' + t['comment'])
         if m:
             print('      ' + ' '.join(f'{k}={fmt(k, v)}' for k, v in m.items()))
         for msg in msgs:
             print('      ' + col(status, msg))
-    print(nl + col('PASS', f"passed={counts['PASS']}") + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}")
-          + ' ' + col('ERROR' if counts['ERROR'] else '', f"errored={counts['ERROR']}") + f" out_of_bbox={counts[OUT]}")
+    print(nl + col('PASS', f"passed={counts['PASS']}") + (f" out_of_bbox={counts[OUT]}" if counts[OUT] else '')
+          + (col('SKIP', f" skipped={counts['SKIP']}") if counts['SKIP'] else '')
+          + (col('ERROR', f" errored={counts['ERROR']}") if counts['ERROR'] else '') + ' ' + col('FAIL' if counts['FAIL'] else '', f"failed={counts['FAIL']}"))
     if out:
         out.write(''.join(json.dumps(r) + '\n' for r in rows))
     sys.exit(1 if counts['FAIL'] or counts['ERROR'] else 0)
@@ -217,7 +225,7 @@ def compare(base_file, new_file, verbose, skip):
     for f in sorted(nb.keys() | nn.keys()):
         if nb.get(f, 0) != nn.get(f, 0):
             print(col('WARN', f'warning: {f} has {nb.get(f, 0)} cases in {base_file} but {nn.get(f, 0)} in {new_file}'))
-    out = [r['src'] for r in new if OUT in (r['status'], base.get(r['src'], {}).get('status'))]
+    out = [r['src'] for r in new if {OUT, 'SKIP'} & {r['status'], base.get(r['src'], {}).get('status')}]
     base = {k: v for k, v in base.items() if k not in out}
     new = [r for r in new if r['src'] not in out]
     for r in new:
@@ -230,14 +238,14 @@ def compare(base_file, new_file, verbose, skip):
             continue
         diff[kind] = diff.get(kind, 0) + 1
         changed = '' if kind == 'fixed' else ' '.join(f"{k}:{b['metrics'].get(k)}->{v}" for k, v in r['metrics'].items() if b['metrics'].get(k) != v)
-        print(col('PASS' if ok_now else 'FAIL', f'{kind:13}') + f" {r['src']:27} {changed}")
+        print(col({'fixed': 'PASS', 'pass': 'PASS', 'now broken': 'FAIL'}.get(kind, 'WARN'), f'{kind:13}') + f" {r['src']:27} {changed}")
         if not ok_now:
             print('              ' + r.get('query', ''))
         for msg in r['fails']:
             print('              ' + col(r['status'], msg))
     passed = lambda rows: sum(r['status'] == 'PASS' for r in rows)
-    print(' '.join(f'{k}={v}' for k, v in diff.items()) + f' | passed {passed(base.values())}/{len(base)} -> {passed(new)}/{len(new)}'
-          + f' | out_of_bbox on one side={len(out)}')
+    print(' '.join(col({'fixed': 'PASS', 'now broken': 'FAIL', 'still failing': 'WARN'}.get(k, ''), f'{k}={v}') for k, v in diff.items()) + f' | passed {passed(base.values())}/{len(base)} -> {passed(new)}/{len(new)}'
+          + f' | out_of_bbox or skipped on one side={len(out)}')
 
 
 def main():
