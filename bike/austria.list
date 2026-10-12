@@ -14,7 +14,8 @@ point=47.288%2C11.396&point=47.266193%2C11.401656
 
 point=48.017946,16.013775&point=47.993885,15.955324
   &profile=bike
-  ascend<600m
+  ascend<610m
+  comment=#201 avoid too steep incline
 
 point=48.179737,16.115484&point=48.175072,16.122608
   &profile=bike
