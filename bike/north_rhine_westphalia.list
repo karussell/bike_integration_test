@@ -1,10 +1,5 @@
-point=51.130653,7.025601&point=51.129593,7.024748
-  &profile=bike
-  distance>135m
-  comment=#1098 (closed, 2017): bike uses bridges with bicycle=no
-
 point=51.25745,7.14858&point=51.25727,7.14617
-  &profile=bike
+  &profile=racingbike
   distance>300m
   comment=#1498 (closed, 2018): bike routed over highway=pedestrian way 180247410 without bicycle=yes
 
