@@ -27,11 +27,6 @@ point=47.211323,11.333352&point=47.214141,11.339644
   distance<709m
   comment=#3049 (closed, 2024): Innsbruck: ordinary bike routed over mtb:scale=2 path (also 47.211323,11.333352 -> 47.221799,11.367835 with mtb:scale=3)
 
-point=47.275433,11.368286&point=47.273794,11.369584
-  &profile=bike
-  distance>230m
-  comment=TODO #3068 (closed, 2024): Innsbruck: way 1087976687 with smoothness=impassable used
-
 point=47.058145,10.963428&point=47.050807,10.9651
   &profile=bike
   distance>900m
