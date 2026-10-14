@@ -98,3 +98,8 @@ point=50.773908,12.977742&point=50.774088,12.978116
   &profile=bike
   distance<40m
   comment=#3412 (closed, 2026): Chemnitz: reverse-oneway penalty 0.2 too strong (also 50.620321,12.302441 -> 50.620307,12.302793; 51.023348,13.705393 -> 51.023104,13.704681)
+
+point=51.039733%2C14.013059&point=51.041073%2C14.023981
+  &profile=bike
+  avoids=51.0405468,14.0232599
+  comment=Duerrroehrsdorf: path with smoothness=impassable (way 108281700) used although detour possible
