@@ -113,3 +113,22 @@ point=51.163758%2C13.474174&point=51.165844%2C13.469991
   &profile=bike
   avoids=51.16535,13.469503
   comment=avoid steps
+
+point=50.691921%2C12.584596&point=50.668943%2C12.604749
+  &profile=bike
+  avoids=50.673674,12.595023
+  comment=tricky route: short secondary vs. calm detour
+
+point=51.581808%2C13.041245&point=51.603458%2C13.034959
+  &profile=bike
+  avoids=51.591742,13.041586
+  contains=51.590768,13.056807
+  bike_network_part>75
+  comment=tricky route: short secondary vs. good bike network
+
+point=50.84831,13.32411&point=50.90649,13.22765
+  &profile=bike
+  avoids=50.875849,13.282121
+  contains=50.903713,13.327185
+  bike_network_part>50
+  comment=tricky route: short secondary vs. good bike network
