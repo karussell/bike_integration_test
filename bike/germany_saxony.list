@@ -103,3 +103,13 @@ point=51.039733%2C14.013059&point=51.041073%2C14.023981
   &profile=bike
   avoids=51.0405468,14.0232599
   comment=Duerrroehrsdorf: path with smoothness=impassable (way 108281700) used although detour possible
+
+point=51.1219%2C13.50324&point=51.163758%2C13.474174
+  &profile=bike
+  avoids=51.13827,13.473567
+  comment=avoid secondary "Wilsdruffer Straße" without cycle infrastructure although regional bike route
+
+point=51.163758%2C13.474174&point=51.165844%2C13.469991
+  &profile=bike
+  avoids=51.16535,13.469503
+  comment=avoid steps
