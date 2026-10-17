@@ -21,6 +21,7 @@ Test case format (blocks separated by blank lines):
   avoids=lat,lon;lat,lon    route stays more than 10 m away from each point
   comment=...               printed on failure
   skip=true                 do not run this case (a comment explaining why is required); compare ignores it
+  # ...                     lines starting with # are ignored
 Operators: <, <=, >, >=, =range (a-b) or =single value (±10 %).
 """
 import argparse, glob, json, math, operator, os, re, sys, urllib.request
@@ -72,7 +73,9 @@ def parse_line(t, l):
 def load(path):
     tests = []
     for block in re.split(r'\n\s*\n', open(path).read().strip()):
-        lines = [l.strip() for l in block.split('\n')]
+        lines = [l.strip() for l in block.split('\n') if not l.lstrip().startswith('#')]
+        if not lines:
+            continue
         t = {'file': os.path.relpath(path, HERE), 'src': f'{os.path.relpath(path, HERE)}:{len(tests) + 1}', 'query': lines[0],
              'points': lines[0].replace('%2C', ','), 'checks': [], 'contains': [], 'avoids': [], 'comment': '', 'skip': False}
         t['coords'] = [tuple(map(float, c)) for c in re.findall(r'point=(-?[\d.]+),(-?[\d.]+)', t['points'])]

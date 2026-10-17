@@ -48,6 +48,7 @@ point=51.03454,13.771749&point=51.04161,13.753145
   distance<1700m
   comment=#1113 (closed, 2017): Dresden Grosser Garten: highway=pedestrian + bicycle=yes should be taken directly through the park
 
+#10
 point=51.419138,14.227558&point=51.414032,14.230755
   &profile=bike
   distance<622m
@@ -99,6 +100,7 @@ point=50.773908,12.977742&point=50.774088,12.978116
   distance<40m
   comment=#3412 (closed, 2026): Chemnitz: reverse-oneway penalty 0.2 too strong (also 50.620321,12.302441 -> 50.620307,12.302793; 51.023348,13.705393 -> 51.023104,13.704681)
 
+#20
 point=51.039733%2C14.013059&point=51.041073%2C14.023981
   &profile=bike
   avoids=51.0405468,14.0232599
