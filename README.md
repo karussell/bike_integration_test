@@ -7,6 +7,10 @@ python3 run_tests.py http://localhost:8989 bike --save bike/results/branch.jsonl
 Where first parameter is the http endpoint and the second is the folder containing list files with
 expected values
 
+# Compare Results
+
+python3 run_tests.py --compare bike/results/master.jsonl bike/results/branch.jsonl
+
 # List Format
 
 One test case per block, blocks separated by blank lines. The first line is the raw `/route` query string,
@@ -39,7 +43,3 @@ point=51.196964,13.309157&point=51.195156,13.374142
 | `skip=true` | case is not run and listed as SKIP, compare ignores it; a `comment` explaining why is required |
 
 Operators: `<`, `<=`, `>`, `>=`, `=a-b` (inclusive range) or `=value` (±10 %).
-
-# Compare Results
-
-python3 run_tests.py --compare bike/results/master.jsonl bike/results/branch.jsonl
