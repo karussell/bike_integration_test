@@ -1,15 +1,23 @@
 # Test expected routes and properties for different branches
 
+```
 python3 run_tests.py http://localhost:8988 bike --save bike/results/master.jsonl
 
 python3 run_tests.py http://localhost:8989 bike --save bike/results/branch.jsonl
+```
 
 Where first parameter is the http endpoint and the second is the folder containing list files with
-expected values. Optionally use --key API_KEY for the GraphHopper Directions API.
+expected values (currently only `bike`). 
+
+Store the results via `--save <file>.jsonl` to later compare different endpoints or branches.
+
+Optionally use `--key API_KEY` for the GraphHopper Directions API.
 
 # Compare Results
 
+```
 python3 run_tests.py --compare bike/results/master.jsonl bike/results/branch.jsonl
+```
 
 # List Format
 
