@@ -5,7 +5,7 @@ python3 run_tests.py http://localhost:8988 bike --save bike/results/master.jsonl
 python3 run_tests.py http://localhost:8989 bike --save bike/results/branch.jsonl
 
 Where first parameter is the http endpoint and the second is the folder containing list files with
-expected values
+expected values. Optionally use --key API_KEY for the GraphHopper Directions API.
 
 # Compare Results
 
