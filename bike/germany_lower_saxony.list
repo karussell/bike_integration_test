@@ -12,3 +12,8 @@ point=52.368569,9.721531&point=52.369329,9.721137
   &profile=mtb
   distance<90m
   comment=#3217 (closed, 2025): Hannover: mtb route network inconsistency causes unnecessary detour
+
+point=52.416782%2C9.448821&point=52.423933%2C9.448752
+  &profile=bike
+  avoids=52.42299,9.450592
+  comment=do not use steps

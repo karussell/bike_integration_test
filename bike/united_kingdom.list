@@ -12,3 +12,8 @@ point=53.25632,-2.584999&point=53.28341,-2.600749
   &profile=bike
   contains=53.270917,-2.588699
   comment=#2796 (closed, 2023): Cheshire: dangerous trunk picked, should be avoided
+
+point=57.14423,-2.09835&point=57.14295,-2.10240
+  &profile=bike
+  avoids=57.144122,-2.100919
+  comment=steps should be avoided
