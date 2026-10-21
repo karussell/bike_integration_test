@@ -111,11 +111,6 @@ point=51.1219%2C13.50324&point=51.163758%2C13.474174
   avoids=51.13827,13.473567
   comment=avoid secondary "Wilsdruffer Straße" without cycle infrastructure although regional bike route
 
-point=51.163758%2C13.474174&point=51.165844%2C13.469991
-  &profile=bike
-  avoids=51.16535,13.469503
-  comment=avoid steps
-
 point=50.691921%2C12.584596&point=50.668943%2C12.604749
   &profile=bike
   avoids=50.673674,12.595023

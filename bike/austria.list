@@ -56,3 +56,9 @@ point=47.052146,16.082349&point=47.065988,16.034605
   &profile=racingbike
   distance<4.3km
   comment=#3387 (closed, 2026): after fix identical to brouter fastbike
+
+point=48.410987,15.599492&point=48.383419,15.659294
+  &profile=bike
+  distance<8km
+  contains=48.40143,15.62507
+  comment=#2803 (closed, 2023): Krems: accept 49 m zig-zag steps (way 47513230, ramp=yes), avoiding them costs +2.4 km / +8 min

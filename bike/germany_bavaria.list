@@ -53,3 +53,8 @@ point=47.482017%2C11.239936&point=47.431504%2C11.262132
   &profile=bike
   distance<8km
   comment=very tricky case but avoiding secondary (maxspeed=100) without cycleway and no shoulder and not wide is too expensive here (6km longer)
+
+point=49.947571,11.614538&point=49.94915,11.619947
+  &profile=bike
+  contains=49.947315,11.619863
+  comment=Bayreuth: avoid 5 m steps (way 61191799, no ramp tag), detour only +80 m / +45 s (160 m footway)
